@@ -8,7 +8,6 @@ Press Ctrl+C in the terminal to stop it.
 
 from flask import Flask, request, jsonify, render_template_string
 from openai import OpenAI
-import CustomTkinter as ctk
 import os
 import threading
 import webbrowser
