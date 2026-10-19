@@ -99,6 +99,7 @@ def submit_basic():
 def submit_options():
     topic    = options_topic.get().strip()
     audience = audience_var.get()
+    simple   = simple_mode_var.get()
 
     if not topic:
         return
@@ -114,6 +115,8 @@ def submit_options():
     if chk_quiz.get():     extras.append("end with one quiz question")
 
     system = f"You are a helpful tutor explaining things to {audience_map.get(audience, 'a student')}."
+    if simple:
+        system += " Keep your language as plain and simple as possible, and keep the whole response short."
     user   = f"Explain: {topic}"
     if extras:
         user += f"\n\nPlease also: {', '.join(extras)}."
@@ -123,15 +126,18 @@ def submit_options():
     show_response(reply, i, o)
 
 def submit_advanced():
-    topic   = adv_topic.get().strip()
-    persona = adv_persona.get().strip()
-    words   = int(slider_var.get())
+    topic    = adv_topic.get().strip()
+    persona  = adv_persona.get().strip()
+    words    = int(slider_var.get())
+    examples = examples_count.get()
 
     if not topic:
         return
 
     system = f"You are {persona or 'a helpful assistant'}. Keep your response under {words} words."
     user   = f"Explain: {topic}"
+    if examples > 0:
+        user += f"\n\nInclude exactly {examples} example{'s' if examples != 1 else ''}."
 
     show_thinking()
     reply, i, o = call_api(system, user)
@@ -200,6 +206,11 @@ for option in ["High school student", "Domain expert", "Young child"]:
     ctk.CTkRadioButton(t2, text=option, variable=audience_var, value=option).pack(
         anchor="w", padx=20, pady=2)
 
+ctk.CTkLabel(t2, text="Toggle", anchor="w").pack(fill="x", padx=10, pady=(10,4))
+simple_mode_var = ctk.BooleanVar(value=False)
+ctk.CTkSwitch(t2, text="Simple mode (shorter, plainer answers)", variable=simple_mode_var).pack(
+    anchor="w", padx=20, pady=(0,10))
+
 # ── TAB 3: ADVANCED ────────────────────────────────────────────────────────
 t3 = tabs.tab("Advanced")
 
@@ -216,6 +227,25 @@ slider_label.pack(fill="x", padx=10, pady=(0,2))
 slider_var = ctk.DoubleVar(value=100)
 ctk.CTkSlider(t3, from_=30, to=300, variable=slider_var, command=update_slider_label).pack(
     fill="x", padx=10, pady=(0,10))
+
+ctk.CTkLabel(t3, text="Number of examples to include", anchor="w").pack(fill="x", padx=10, pady=(0,4))
+
+examples_count = ctk.IntVar(value=1)
+
+def adjust_examples(delta):
+    new_value = max(0, min(5, examples_count.get() + delta))
+    examples_count.set(new_value)
+    examples_display.configure(text=str(new_value))
+
+stepper_frame = ctk.CTkFrame(t3, fg_color="transparent")
+stepper_frame.pack(anchor="w", padx=20, pady=(0,10))
+
+ctk.CTkButton(stepper_frame, text="−", width=32, height=32,
+              command=lambda: adjust_examples(-1)).pack(side="left")
+examples_display = ctk.CTkLabel(stepper_frame, text="1", width=32)
+examples_display.pack(side="left", padx=10)
+ctk.CTkButton(stepper_frame, text="+", width=32, height=32,
+              command=lambda: adjust_examples(1)).pack(side="left")
 
 # ── SHARED SUBMIT BUTTON ───────────────────────────────────────────────────
 submit_button = ctk.CTkButton(app, text="Submit", width=120, command=lambda: {

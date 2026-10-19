@@ -102,6 +102,54 @@ HTML = """
     accent-color: #7eb8f7; cursor: pointer;
   }
 
+  /* toggle switch */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.9rem; cursor: pointer;
+  }
+  .toggle-switch {
+    position: relative; display: inline-block;
+    width: 42px; height: 24px; flex-shrink: 0;
+  }
+  .toggle-switch input {
+    opacity: 0; width: 0; height: 0;
+  }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: #444; border-radius: 24px;
+    transition: background 0.15s;
+  }
+  .toggle-slider::before {
+    content: ""; position: absolute;
+    height: 18px; width: 18px; left: 3px; top: 3px;
+    background: #e0e0e0; border-radius: 50%;
+    transition: transform 0.15s;
+  }
+  .toggle-switch input:checked + .toggle-slider {
+    background: #7eb8f7;
+  }
+  .toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+  }
+
+  /* stepper */
+  .stepper {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .stepper-btn {
+    width: 32px; height: 32px;
+    background: #2a2a2a; border: 1px solid #444; border-radius: 6px;
+    color: #e0e0e0; font-size: 1.1rem; line-height: 1;
+    cursor: pointer; margin-top: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .stepper-btn:hover { background: #3a3a3a; }
+  #examples-count {
+    min-width: 24px; text-align: center;
+    font-size: 1rem; font-weight: 600; color: #e0e0e0;
+  }
+
   /* ── buttons ── */
   .btn-row { display: flex; gap: 10px; margin-top: 8px; }
   button.primary {
@@ -207,6 +255,17 @@ HTML = """
       </div>
     </div>
 
+    <h2 style="margin-top: 24px;">Toggle — simple mode</h2>
+    <div class="field">
+      <label class="toggle-row">
+        <span>Simple mode (shorter, plainer answers)</span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="toggle-simple">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+    </div>
+
     <h2 style="margin-top: 24px;">Radio buttons — audience</h2>
 
     <div class="field">
@@ -256,6 +315,15 @@ HTML = """
     <div class="field">
       <label for="persona">AI persona (text input used in system prompt)</label>
       <input type="text" id="persona" placeholder="e.g. a patient tutor, a Socratic teacher">
+    </div>
+
+    <div class="field">
+      <label>Number of examples to include</label>
+      <div class="stepper">
+        <button type="button" class="stepper-btn" onclick="adjustExamples(-1)">−</button>
+        <span id="examples-count">1</span>
+        <button type="button" class="stepper-btn" onclick="adjustExamples(1)">+</button>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -335,16 +403,24 @@ HTML = """
       examples:  document.getElementById('chk-examples').checked,
       analogy:   document.getElementById('chk-analogy').checked,
       quiz:      document.getElementById('chk-quiz').checked,
+      simple:    document.getElementById('toggle-simple').checked,
       audience:  document.querySelector('input[name="audience"]:checked').value
     }, 'submit-options');
   }
 
+  let examplesCount = 1;
+  function adjustExamples(delta) {
+    examplesCount = Math.max(0, Math.min(5, examplesCount + delta));
+    document.getElementById('examples-count').textContent = examplesCount;
+  }
+
   function submitAdvanced() {
     post({
-      mode:    'advanced',
-      topic:   document.getElementById('topic3').value,
-      persona: document.getElementById('persona').value,
-      words:   document.getElementById('words').value
+      mode:     'advanced',
+      topic:    document.getElementById('topic3').value,
+      persona:  document.getElementById('persona').value,
+      words:    document.getElementById('words').value,
+      examples: examplesCount
     }, 'submit-advanced');
   }
 </script>
@@ -396,6 +472,7 @@ def chat():
         examples = data.get("examples", False)
         analogy  = data.get("analogy",  False)
         quiz     = data.get("quiz",     False)
+        simple   = data.get("simple",   False)
 
         audience_map = {
             "student": "a high school student",
@@ -409,18 +486,23 @@ def chat():
         if quiz:     extras.append("end with one quiz question")
 
         system = f"You are a helpful tutor explaining things to {audience_map.get(audience, 'a student')}."
+        if simple:
+            system += " Keep your language as plain and simple as possible, and keep the whole response short."
         user   = f"Explain: {topic}"
         if extras:
             user += f"\n\nPlease also: {', '.join(extras)}."
 
     # ── advanced tab ──
     elif mode == "advanced":
-        topic   = data.get("topic",   "").strip()
-        persona = data.get("persona", "a helpful assistant").strip()
-        words   = data.get("words",   100)
+        topic    = data.get("topic",    "").strip()
+        persona  = data.get("persona",  "a helpful assistant").strip()
+        words    = data.get("words",    100)
+        examples = data.get("examples", 1)
 
         system = f"You are {persona or 'a helpful assistant'}. Keep your response under {words} words."
         user   = f"Explain: {topic}"
+        if examples > 0:
+            user += f"\n\nInclude exactly {examples} example{'s' if examples != 1 else ''}."
 
     else:
         return jsonify({"reply": "Unknown mode.", "input_tokens": 0,
